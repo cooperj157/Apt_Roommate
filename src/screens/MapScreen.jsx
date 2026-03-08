@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { allApartments } from '../data/dummy';
+import rentcastData from '../data/rentcast.json';
 import ApartmentDetail from './ApartmentDetail';
 
 const W = 340, H = 380;
@@ -12,13 +13,40 @@ function toSvg(lat, lng) {
 }
 
 const dcPts = [
-  toSvg(38.994, -77.020), // N
-  toSvg(38.893, -76.911), // E
-  toSvg(38.788, -77.038), // S
-  toSvg(38.893, -77.120), // W
+  toSvg(38.994, -77.020),
+  toSvg(38.893, -76.911),
+  toSvg(38.788, -77.038),
+  toSvg(38.893, -77.120),
 ].map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
 
+function normalizeRentcast(listing) {
+  return {
+    id: listing.id,
+    price: `$${listing.price?.toLocaleString()}/mo`,
+    neighborhood: listing.city ? `${listing.city}, ${listing.state}` : 'Washington, DC',
+    address: listing.formattedAddress || listing.addressLine1 || '',
+    beds: listing.bedrooms ?? '?',
+    baths: listing.bathrooms ?? '?',
+    sqft: listing.squareFootage ?? '?',
+    availability: 'Available Now',
+    photo: listing.photoUrls?.[0] || 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&q=80',
+    description: listing.description || '',
+    amenities: [],
+    landlord: listing.listedBy || '',
+    lat: listing.latitude,
+    lng: listing.longitude,
+  };
+}
+
+// Use live Rentcast data if available, otherwise fall back to dummy data
+const liveListings = Array.isArray(rentcastData) && rentcastData.length > 0
+  ? rentcastData.filter(l => l.latitude && l.longitude && l.price).map(normalizeRentcast)
+  : null;
+
+const isLive = liveListings && liveListings.length > 0;
+
 export default function MapScreen() {
+  const [listings] = useState(isLive ? liveListings : allApartments);
   const [listView, setListView] = useState(false);
   const [selectedApt, setSelectedApt] = useState(null);
 
@@ -33,8 +61,9 @@ export default function MapScreen() {
           <button className="back-btn" onClick={() => setListView(false)}>‹</button>
           <h1>Apartment List</h1>
         </div>
+        {!isLive && <div className="map-status map-status-warn">Showing sample data — run refresh script for live listings</div>}
         <div className="apt-list-view">
-          {allApartments.map(apt => (
+          {listings.map(apt => (
             <div key={apt.id} className="apt-card" style={{ cursor: 'pointer' }} onClick={() => setSelectedApt(apt)}>
               <img src={apt.photo} alt={apt.neighborhood} />
               <div className="apt-card-body">
@@ -57,6 +86,7 @@ export default function MapScreen() {
         <button className="back-btn" style={{ visibility: 'hidden' }}>‹</button>
         <h1>Map of Apartments</h1>
       </div>
+      {!isLive && <div className="map-status map-status-warn">Showing sample data — run refresh script for live listings</div>}
       <div className="map-search-row">
         <div className="map-search-wrap">
           <span className="map-search-icon">🔍</span>
@@ -73,30 +103,29 @@ export default function MapScreen() {
           {[50,100,150,200,250,300].map(x => (
             <line key={'v'+x} x1={x} y1="0" x2={x} y2={H} stroke="#e5dfd9" strokeWidth="1" />
           ))}
-          {/* Potomac */}
           <path d="M 40 350 Q 100 360 160 330 Q 200 315 240 328 Q 280 342 320 334"
             fill="none" stroke="#b8d4ea" strokeWidth="20" strokeLinecap="round" opacity="0.75" />
-          {/* DC diamond */}
-          <polygon points={dcPts} fill="rgba(194,24,91,0.13)" stroke="#C2185B" strokeWidth="2.5" />
-          {/* Price pins */}
-          {allApartments.map(apt => {
-            const { x, y } = toSvg(apt.lat, apt.lng);
-            const label = apt.price.replace('/mo', '');
-            return (
-              <g key={apt.id} transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`}
-                 style={{ cursor: 'pointer' }} onClick={() => setSelectedApt(apt)}>
-                <filter id="ps" x="-20%" y="-20%" width="140%" height="160%">
-                  <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.15" />
-                </filter>
-                <rect x="-36" y="-16" width="72" height="24" rx="8"
-                      fill="white" stroke="#e8d0d8" strokeWidth="1" filter="url(#ps)" />
-                <text x="-26" y="3" fontSize="10" fill="#C2185B">🏠</text>
-                <text x="-10" y="3" fontSize="11" fontWeight="600" fill="#1a1a1a"
-                      fontFamily="-apple-system, sans-serif">{label}</text>
-                <polygon points="-4,8 4,8 0,15" fill="white" />
-              </g>
-            );
-          })}
+          <polygon points={dcPts} fill="rgba(26,122,133,0.1)" stroke="#1A7A85" strokeWidth="2.5" />
+          {listings
+            .filter(apt => apt.lat && apt.lng)
+            .map(apt => {
+              const { x, y } = toSvg(apt.lat, apt.lng);
+              const label = apt.price.replace('/mo', '');
+              return (
+                <g key={apt.id} transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`}
+                   style={{ cursor: 'pointer' }} onClick={() => setSelectedApt(apt)}>
+                  <filter id="ps" x="-20%" y="-20%" width="140%" height="160%">
+                    <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.15" />
+                  </filter>
+                  <rect x="-36" y="-16" width="72" height="24" rx="8"
+                        fill="white" stroke="#C8E2E6" strokeWidth="1" filter="url(#ps)" />
+                  <text x="-26" y="3" fontSize="10" fill="#1A7A85">🏠</text>
+                  <text x="-10" y="3" fontSize="11" fontWeight="600" fill="#1a1a1a"
+                        fontFamily="-apple-system, sans-serif">{label}</text>
+                  <polygon points="-4,8 4,8 0,15" fill="white" />
+                </g>
+              );
+            })}
         </svg>
         <button className="map-show-list-btn" onClick={() => setListView(true)}>
           Show List

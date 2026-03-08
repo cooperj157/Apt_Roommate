@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "refresh-listings": "curl -s 'https://api.rentcast.io/v1/listings/rental/long-term?city=Washington&state=DC&limit=20&status=Active' -H \"X-Api-Key: $RENTCAST_API_KEY\" -H 'Accept: application/json' > src/data/rentcast.json && echo 'Listings refreshed!'"
   },
   "dependencies": {
     "react": "^18.2.0",
