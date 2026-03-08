@@ -1,54 +1,100 @@
 import { useState } from 'react';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { allApartments } from '../data/dummy';
-import rentcastData from '../data/rentcast.json';
+import rentcastRaw from '../data/rentcast.json';
 import ApartmentDetail from './ApartmentDetail';
 
-const W = 340, H = 380;
-const BOUNDS = { latMin: 38.785, latMax: 38.999, lngMin: -77.130, lngMax: -76.900 };
+// Fix Leaflet default icon path issue with Vite
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
 
-function toSvg(lat, lng) {
-  const x = ((lng - BOUNDS.lngMin) / (BOUNDS.lngMax - BOUNDS.lngMin)) * W;
-  const y = ((BOUNDS.latMax - lat) / (BOUNDS.latMax - BOUNDS.latMin)) * H;
-  return { x, y };
+function makePriceIcon(price, color = '#1A7A85') {
+  const label = `$${Number(price).toLocaleString()}`;
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="
+        background: white;
+        border: 2px solid ${color};
+        border-radius: 8px;
+        padding: 4px 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #1a1a1a;
+        white-space: nowrap;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        position: relative;
+        font-family: -apple-system, sans-serif;
+      ">
+        <span style="color:${color}; margin-right:3px;">🏠</span>${label}/mo
+        <div style="
+          position: absolute; bottom: -7px; left: 50%;
+          transform: translateX(-50%);
+          width: 0; height: 0;
+          border-left: 6px solid transparent;
+          border-right: 6px solid transparent;
+          border-top: 7px solid ${color};
+        "></div>
+      </div>`,
+    iconAnchor: [40, 36],
+    iconSize: [80, 36],
+  });
 }
 
-const dcPts = [
-  toSvg(38.994, -77.020),
-  toSvg(38.893, -76.911),
-  toSvg(38.788, -77.038),
-  toSvg(38.893, -77.120),
-].map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-
-function normalizeRentcast(listing) {
+function normalizeRentcast(l) {
   return {
-    id: listing.id,
-    price: `$${listing.price?.toLocaleString()}/mo`,
-    neighborhood: listing.city ? `${listing.city}, ${listing.state}` : 'Washington, DC',
-    address: listing.formattedAddress || listing.addressLine1 || '',
-    beds: listing.bedrooms ?? '?',
-    baths: listing.bathrooms ?? '?',
-    sqft: listing.squareFootage ?? '?',
+    id: l.id,
+    price: `$${Number(l.price).toLocaleString()}/mo`,
+    neighborhood: l.city ? `${l.city}, ${l.state}` : 'Washington, DC',
+    address: l.formattedAddress || l.addressLine1 || '',
+    beds: l.bedrooms ?? '?',
+    baths: l.bathrooms ?? '?',
+    sqft: l.squareFootage ?? '?',
     availability: 'Available Now',
-    photo: listing.photoUrls?.[0] || 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&q=80',
-    description: listing.description || '',
+    photo: l.photoUrls?.[0] || 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&q=80',
+    description: l.description || '',
     amenities: [],
-    landlord: listing.listedBy || '',
-    lat: listing.latitude,
-    lng: listing.longitude,
+    landlord: l.listedBy || '',
+    lat: l.latitude,
+    lng: l.longitude,
+    rawPrice: l.price,
   };
 }
 
-// Use live Rentcast data if available, otherwise fall back to dummy data
-const liveListings = Array.isArray(rentcastData) && rentcastData.length > 0
-  ? rentcastData.filter(l => l.latitude && l.longitude && l.price).map(normalizeRentcast)
+const liveListings = Array.isArray(rentcastRaw) && rentcastRaw.length > 0
+  ? rentcastRaw.filter(l => l.latitude && l.longitude && l.price).map(normalizeRentcast)
   : null;
 
-const isLive = liveListings && liveListings.length > 0;
+const listings = liveListings?.length ? liveListings : allApartments;
+const isLive = !!(liveListings?.length);
+
+// Suppress map re-render flicker when parent re-renders
+function ClickableMarkers({ listings, onSelect }) {
+  const map = useMap();
+  return listings.map(apt => (
+    <Marker
+      key={apt.id}
+      position={[apt.lat, apt.lng]}
+      icon={makePriceIcon(apt.rawPrice || apt.price.replace(/[^0-9]/g, ''))}
+      eventHandlers={{
+        click: () => {
+          map.panTo([apt.lat, apt.lng], { animate: true });
+          onSelect(apt);
+        },
+      }}
+    />
+  ));
+}
 
 export default function MapScreen() {
-  const [listings] = useState(isLive ? liveListings : allApartments);
-  const [listView, setListView] = useState(false);
   const [selectedApt, setSelectedApt] = useState(null);
+  const [listView, setListView] = useState(false);
 
   if (selectedApt) {
     return <ApartmentDetail apt={selectedApt} onBack={() => setSelectedApt(null)} />;
@@ -61,7 +107,7 @@ export default function MapScreen() {
           <button className="back-btn" onClick={() => setListView(false)}>‹</button>
           <h1>Apartment List</h1>
         </div>
-        {!isLive && <div className="map-status map-status-warn">Showing sample data — run refresh script for live listings</div>}
+        {!isLive && <div className="map-status map-status-warn">Showing sample data</div>}
         <div className="apt-list-view">
           {listings.map(apt => (
             <div key={apt.id} className="apt-card" style={{ cursor: 'pointer' }} onClick={() => setSelectedApt(apt)}>
@@ -70,7 +116,7 @@ export default function MapScreen() {
                 <div className="apt-price">{apt.price}</div>
                 <div className="apt-neighborhood">{apt.neighborhood}</div>
                 <div className="apt-address">{apt.address}</div>
-                <div className="apt-specs">{apt.beds}BR / {apt.baths}BA &middot; {apt.sqft} sqft &middot; {apt.availability}</div>
+                <div className="apt-specs">{apt.beds}BR / {apt.baths}BA · {apt.sqft} sqft · {apt.availability}</div>
                 <button className="apt-link">View Details</button>
               </div>
             </div>
@@ -83,10 +129,8 @@ export default function MapScreen() {
   return (
     <div className="map-screen">
       <div className="top-bar">
-        <button className="back-btn" style={{ visibility: 'hidden' }}>‹</button>
         <h1>Map of Apartments</h1>
       </div>
-      {!isLive && <div className="map-status map-status-warn">Showing sample data — run refresh script for live listings</div>}
       <div className="map-search-row">
         <div className="map-search-wrap">
           <span className="map-search-icon">🔍</span>
@@ -95,38 +139,19 @@ export default function MapScreen() {
         <button className="map-filter-btn">⚙</button>
       </div>
       <div className="map-container">
-        <svg viewBox={`0 0 ${W} ${H}`} className="map-svg" xmlns="http://www.w3.org/2000/svg">
-          <rect width={W} height={H} fill="#f2ede8" />
-          {[60,110,160,210,260,310].map(y => (
-            <line key={'h'+y} x1="0" y1={y} x2={W} y2={y} stroke="#e5dfd9" strokeWidth="1" />
-          ))}
-          {[50,100,150,200,250,300].map(x => (
-            <line key={'v'+x} x1={x} y1="0" x2={x} y2={H} stroke="#e5dfd9" strokeWidth="1" />
-          ))}
-          <path d="M 40 350 Q 100 360 160 330 Q 200 315 240 328 Q 280 342 320 334"
-            fill="none" stroke="#b8d4ea" strokeWidth="20" strokeLinecap="round" opacity="0.75" />
-          <polygon points={dcPts} fill="rgba(26,122,133,0.1)" stroke="#1A7A85" strokeWidth="2.5" />
-          {listings
-            .filter(apt => apt.lat && apt.lng)
-            .map(apt => {
-              const { x, y } = toSvg(apt.lat, apt.lng);
-              const label = apt.price.replace('/mo', '');
-              return (
-                <g key={apt.id} transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`}
-                   style={{ cursor: 'pointer' }} onClick={() => setSelectedApt(apt)}>
-                  <filter id="ps" x="-20%" y="-20%" width="140%" height="160%">
-                    <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.15" />
-                  </filter>
-                  <rect x="-36" y="-16" width="72" height="24" rx="8"
-                        fill="white" stroke="#C8E2E6" strokeWidth="1" filter="url(#ps)" />
-                  <text x="-26" y="3" fontSize="10" fill="#1A7A85">🏠</text>
-                  <text x="-10" y="3" fontSize="11" fontWeight="600" fill="#1a1a1a"
-                        fontFamily="-apple-system, sans-serif">{label}</text>
-                  <polygon points="-4,8 4,8 0,15" fill="white" />
-                </g>
-              );
-            })}
-        </svg>
+        <MapContainer
+          center={[38.9072, -77.0369]}
+          zoom={13}
+          style={{ height: '100%', width: '100%' }}
+          zoomControl={false}
+          scrollWheelZoom={true}
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          />
+          <ClickableMarkers listings={listings} onSelect={setSelectedApt} />
+        </MapContainer>
         <button className="map-show-list-btn" onClick={() => setListView(true)}>
           Show List
         </button>
