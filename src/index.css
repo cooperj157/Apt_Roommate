@@ -364,6 +364,13 @@ html, body, #root {
   margin-bottom: 10px; transition: background 0.2s, color 0.2s;
 }
 .detail-add-btn.added { background: var(--primary-light); color: var(--primary); border-color: var(--primary-light); }
+.detail-zillow-btn {
+  display: block; width: 100%; text-align: center;
+  background: #006AFF; color: white;
+  border-radius: 12px; padding: 13px;
+  font-size: 15px; font-weight: 600;
+  text-decoration: none; margin-bottom: 10px;
+}
 .detail-contact-btn {
   width: 100%; background: var(--primary); color: white;
   border: none; border-radius: 12px;

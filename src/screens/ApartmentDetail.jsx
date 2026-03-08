@@ -51,6 +51,15 @@ export default function ApartmentDetail({ apt, onBack }) {
           {added ? '✓ Added to Profile' : '+ Add Apartment to Profile'}
         </button>
 
+        <a
+          className="detail-zillow-btn"
+          href={`https://www.zillow.com/homes/${encodeURIComponent(apt.address.replace(/,/g, '').replace(/\s+/g, '-'))}_rb/`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          View on Zillow ↗
+        </a>
+
         <button className="detail-contact-btn">Contact Landlord</button>
       </div>
     </div>
