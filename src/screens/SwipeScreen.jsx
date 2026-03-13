@@ -58,7 +58,7 @@ export default function SwipeScreen({ navigate }) {
     dragStart.current = null;
 
     // Swipe down: downward movement dominant and past threshold
-    if (dy > 40 && dy > Math.abs(dx) * 1.2) {
+    if (dy > 20 && dy > Math.abs(dx) * 0.5) {
       setShowApts(true);
       return;
     }
