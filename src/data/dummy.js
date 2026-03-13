@@ -210,11 +210,7 @@ export const messages = [
     time: '7:46 PM',
     unread: 1,
     online: true,
-    chat: [
-      { from: 'them', text: 'Hey! I saw we matched — awesome!', time: '7:30 PM' },
-      { from: 'me',   text: 'Hey Darius! Yeah, excited to connect.', time: '7:35 PM' },
-      { from: 'them', text: 'Hey, that 2BR looks perfect!', time: '7:46 PM' },
-    ],
+    chat: [],
   },
   {
     id: 2,

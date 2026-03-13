@@ -123,9 +123,6 @@ export default function SwipeScreen({ navigate }) {
             <div className="flip-face flip-front">
               <div className="card-photo-wrap">
                 <img className="card-photo" src={current.photo} alt={current.name} />
-                <button className={`card-bookmark${saved[current.id] ? ' active' : ''}`} onClick={doSave}>
-                  🔖
-                </button>
                 <div className="swipe-down-hint">
                   Swipe Down<br />to view<br />apartments
                   <span className="hint-arrow">↓</span>
@@ -181,7 +178,6 @@ export default function SwipeScreen({ navigate }) {
       <div className="card-actions">
         <button className="btn-pass" onClick={doPass}>✕</button>
         <button className={`btn-like${liked[current.id] ? ' active' : ''}`} onClick={doLike}>♡</button>
-        <button className={`btn-save${saved[current.id] ? ' active' : ''}`} onClick={doSave}>🔖</button>
       </div>
 
       <div className="dot-indicators">
